@@ -3,7 +3,7 @@ version: '2.3'
 services:
   conductor-server:
     environment:
-      - CONFIG_PROP=config.properties
+      - CONFIG_PROP=config-mysql.properties
     image: conductor:server
     build:
       context: ../
@@ -14,11 +14,11 @@ services:
       - 8080:8080
     links:
       - elasticsearch:es
-      - dynomite:dyno1
+      - mysql:mysql
     depends_on:
       elasticsearch:
         condition: service_healthy
-      dynomite:
+      mysql:
         condition: service_healthy
     logging:
       driver: "json-file"
@@ -40,14 +40,22 @@ services:
     links:
       - conductor-server
 
-  dynomite:
-    image: v1r3n/dynomite
+  mysql:
+    image: mysql:5.7
+    restart: always
+    environment:
+      MYSQL_DATABASE: 'conductor'
+      MYSQL_USER: 'uconductor'
+      MYSQL_PASSWORD: 'pconductor'
+      MYSQL_ROOT_PASSWORD: 'rconductor'
     networks:
       - internal
     ports:
-      - 8102:8102
+      - '3306:3306'
+    volumes:
+      - '/docker-volumes/orchestrator/mysql:/var/lib/mysql'
     healthcheck:
-      test: timeout 5 bash -c 'cat < /dev/null > /dev/tcp/localhost/8102'
+      test: "/usr/bin/mysql --user=uconductor --password=pconductor --execute \"SHOW DATABASES;\""
       interval: 5s
       timeout: 5s
       retries: 12
@@ -56,6 +64,7 @@ services:
       options:
         max-size: "1k"
         max-file: "3"
+
 
   # https://www.elastic.co/guide/en/elasticsearch/reference/5.6/docker.html
   elasticsearch:
@@ -80,6 +89,17 @@ services:
       options:
         max-size: "1k"
         max-file: "3"
+
+  mongo:
+    image: mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - '/docker-volumes/orchestrator/mongo/:/data/db'
+    networks:
+      - internal
+    logging:
+      driver: none
 
 networks:
   internal:
